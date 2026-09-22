@@ -11,18 +11,19 @@ Owner direction: patient piano instructor + practical engineer. Change the exist
 ## What exists (web prototype — THIS is the product today)
 
 ```
-index.html              screens; loads css + js
-css/app.css             dark studio, teal/gold, keys, landscape
-js/grand-engine.js      ONLY PianoEngine
-js/app.js               lessons, waterfall, scoring, save
+index.html              screens; loads css + js (flat on GitHub: app.css, *.js at root)
+app.css / css/app.css   dark studio, teal/gold, keys, landscape
+grand-engine.js         ONLY PianoEngine
+mic-engine.js           MicPitch (Web Audio autocorrelation → InputProvider)
+app.js                  lessons, waterfall, scoring, save, MIDI + mic UI
 GROK-HANDOFF.md         these rules
 ```
 
-Load order must stay: `grand-engine.js` then `app.js`. One `const PianoEngine` only, in grand-engine.js.
+Load order must stay: `grand-engine.js` → `mic-engine.js` → `app.js`. One `const PianoEngine` only, in grand-engine.js.
 
 ## What is only in the PRD (not built)
 
-Native iOS + Android Flutter app. Real OAuth. App Store / Play / Stripe payments. Acoustic-mic note recognition. Multi-velocity bundled grand (pp/mp/mf/ff). Offline sample pack. Do not implement those unless asked. Do not treat PRD text as current code.
+Native iOS + Android Flutter app. Real OAuth. App Store / Play / Stripe payments. Multi-velocity bundled grand (pp/mp/mf/ff). Offline sample pack. Do not implement those unless asked. Do not treat PRD text as current code.
 
 ## Audio (honest)
 
@@ -47,7 +48,7 @@ Web uses **recorded acoustic-grand samples**, one dynamic per pitch (C1–C8) fr
 - Scoring, badges by stage, auto-advance to next lesson
 - Progress: localStorage `sparkkeys-progress-v2` (completed[], currentLesson, unlocked[], badges)
 - Profile: localStorage `sparkkeys-profile-v1` (name, email, provider email|google|facebook, signedIn). Google/Facebook are local tags only
-- Inputs: pointer multitouch piano, computer keys, Web MIDI. Long-press callout disabled on keys
+- Inputs: pointer multitouch piano, computer keys, Web MIDI, MicPitch (mic-engine.js → InputProvider). Long-press callout disabled on keys
 - Landscape: viewport width/height + matchMedia + visualViewport + resize. Wide button is preview fallback. Do not fake rotate(90deg)
 - Visuals: dark stage, teal/gold, camera ease into studio, ambient lights, finger coach at TOP of waterfall
 
