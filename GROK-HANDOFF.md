@@ -38,8 +38,8 @@ Web uses **recorded acoustic-grand samples**, one dynamic per pitch (C1–C8) fr
 
 ## Teaching product (in app.js)
 
-- 25 song-first lessons (TEST_UNLOCK_ALL = true)
-- Songs: Ode to Joy, Twinkle, Mary, Canon (beginner C), Clair de Lune (simplified), Keys tour
+- 29 song-first lessons (TEST_UNLOCK_ALL = true)
+- Songs: Ode to Joy, Twinkle, Mary, Canon (beginner C), Clair de Lune (simplified), Minuet in G (Petzold PD melody), Prelude in C (Bach BWV 846 simplified outline), Keys tour
 - First song from two-stave Ode PDF: C major 4/4, rests bars 4 and 8; LH walks on the same quarter grid
 - Modes: Waterfall (default), Sheet
 - Hands: Right, Left, Both

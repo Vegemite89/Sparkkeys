@@ -10,7 +10,7 @@ app.css            dark studio theme, keys, landscape
 grand-engine.js    recorded grand samples (1 velocity layer + gain/filter)
 mic-engine.js      MicPitch — Web Audio single-note mic → InputProvider
 mic.css            Mic chip / status styles
-app.js             25 lessons, waterfall, scoring, localStorage
+app.js             29 lessons, waterfall, scoring, localStorage
 GROK-HANDOFF.md    brief for another Grok chat
 ```
 
