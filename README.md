@@ -1,25 +1,19 @@
 # SparkKeys
 
-Beginner piano teaching web prototype.
+Web prototype of a beginner piano app.
 
-## Repo files that are the product today
+## Files in this repo
 
-- `index.html` — screens; loads CSS + JS
-- `css/app.css` — dark studio, teal/gold, keys, landscape
-- `js/grand-engine.js` — only `PianoEngine` (recorded grand samples, 1 velocity layer)
-- `js/app.js` — lessons, waterfall, scoring, save
-- `GROK-HANDOFF.md` — rules for any Grok / Grok Bot working on this app
+```
+index.html         app shell (home, studio, course, theory, profile)
+app.css            dark studio theme, keys, landscape
+grand-engine.js    recorded grand samples (1 velocity layer + gain/filter)
+app.js             25 lessons, waterfall, scoring, localStorage
+GROK-HANDOFF.md    brief for another Grok chat
+```
 
-`preview.html` lives in the Grok project folder for in-chat preview. It is the same app with CSS+JS inlined.
+`index.html` loads `app.css`, then `grand-engine.js`, then `app.js`.
 
-## Rules
+The Grok project folder still uses `css/app.css` and `js/…`. This GitHub copy is flattened so the page actually finds the files.
 
-- Change these files. Do not start a new app.
-- Load order: `grand-engine.js` then `app.js`.
-- One `const PianoEngine` only, in `grand-engine.js`.
-- Audio is recorded samples from the tonejs-instruments CDN, one dynamic per pitch. Velocity is gain + filter, not four hammer layers.
-- Do not store card numbers.
-- iPhone cannot run a downloaded HTML folder as a website.
-- GitHub Pages is not enabled.
-
-Repo: https://github.com/Vegemite89/Sparkkeys
+Audio: one recorded dynamic per pitch from a CDN. Not four hammer layers.
