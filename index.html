@@ -46,7 +46,11 @@
           <button class="card" data-go="keys"><div><h3>Keys lab</h3><p>Tap and hear</p></div></button>
           <button class="card" data-go="profile"><div><h3>Profile</h3><p id="profileNavHint">Email, Google, Facebook</p></div></button>
         </div>
-        <p style="margin:12px 2px 0;font-size:12px;color:var(--muted)" id="midiStatus"><span class="midi-dot" id="midiDot"></span>Concert grand · first tap loads samples · hold to sustain · MIDI optional</p>
+        <div class="io-status" id="ioStatus">
+          <button type="button" class="chip mic-chip" id="micChip" title="Tap to enable microphone note detection">Mic</button>
+          <p id="midiStatus"><span class="midi-dot" id="midiDot"></span>Concert grand · first tap loads samples · hold to sustain · MIDI optional</p>
+          <p id="micStatus"><span class="midi-dot" id="micDot"></span>Mic off</p>
+        </div>
       </section>
 
       <section class="screen" id="course">
@@ -211,6 +215,7 @@
   </div>
 
   <script src="grand-engine.js"></script>
+  <script src="mic-engine.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
