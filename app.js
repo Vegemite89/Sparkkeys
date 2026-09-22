@@ -151,3 +151,96 @@ const SONGS = {
   }
 };
 function n(t,d,midi,finger,hand){ return {t,d,midi,finger,hand}; }
+
+const state = {
+  song: "ode",
+  mode: "fall", // fall | sheet
+  hands: "R",
+  playing: false,
+  wait: true,
+  showNames: true,
+  beat: 0,
+  startPerf: 0,
+  lastFrame: 0,
+  bpm: 80,
+  volume: 0.7,
+  awaiting: [],
+  audio: null,
+  held: new Map(),
+  assist: "learn",
+  lessonId: null,
+  lessonNotes: null,
+  showFingers: true,
+  showGuides: true,
+  score: null,
+  midi: { access: null, name: null },
+  sustainPedal: false,
+  forceLandscape: false
+};
+
+const els = {
+  home: document.getElementById("home"),
+  studio: document.getElementById("studio"),
+  playBtn: document.getElementById("playBtn"),
+  bpm: document.getElementById("bpm"),
+  bpmLabel: document.getElementById("bpmLabel"),
+  vol: document.getElementById("vol"),
+  volLabel: document.getElementById("volLabel"),
+  lessonTitle: document.getElementById("lessonTitle"),
+  lessonSub: document.getElementById("lessonSub"),
+  coach: document.getElementById("coach"),
+  fall: document.getElementById("fall"),
+  staffWrap: document.getElementById("staffWrap"),
+  staff: document.getElementById("staff"),
+  whites: document.getElementById("whites"),
+  blacks: document.getElementById("blacks"),
+  hintbar: document.getElementById("hintbar"),
+  pbar: document.getElementById("pbar"),
+  toast: document.getElementById("toast"),
+  waitChip: document.getElementById("waitChip"),
+  nameChip: document.getElementById("nameChip"),
+  modeSheet: document.getElementById("modeSheet"),
+  modeFall: document.getElementById("modeFall"),
+  handR: document.getElementById("handR"),
+  handL: document.getElementById("handL"),
+  handB: document.getElementById("handB")
+};
+
+function currentNotes() {
+  const all = state.lessonNotes || SONGS[state.song].notes;
+  if (state.hands === "B") return all;
+  return all.filter(x => x.hand === state.hands);
+}
+function songLen() {
+  const notes = currentNotes();
+  return notes.reduce((m, x) => Math.max(m, x.t + x.d), 8);
+}
+
+function ensureAudio() {
+  const audio = PianoEngine.ensure();
+  if (typeof PianoEngine.warmVisible === "function") PianoEngine.warmVisible(WHITE_START, WHITE_END);
+  return audio;
+}
+function playTone(midi, dur = 0.4) {
+  const id = PianoEngine.noteOn(midi, 84);
+  const voice = PianoEngine.voices.find(v => v.id === id);
+  if (voice) voice.preview = true;
+  const ms = Math.max(160, dur * 1000);
+  setTimeout(() => {
+    const v = PianoEngine.voices.find(x => x.id === id);
+    if (!v || v.dead) return;
+    if (!v.preview && (touchHoldCount.get(midi) || 0) > 0) return;
+    PianoEngine._release(v);
+  }, ms);
+}
+const activeVoices = PianoEngine.held;
+function startHeldNote(midi, velocity) {
+  if (typeof PianoEngine.prioritize === "function") PianoEngine.prioritize(midi);
+  PianoEngine.noteOn(midi, velocity == null ? 82 : velocity);
+}
+function stopHeldNote(midi) {
+  PianoEngine.noteOff(midi);
+}
+function stopAllHeldNotes() {
+  PianoEngine.stopAll();
+}
