@@ -59,7 +59,6 @@
       return { freq: null, rms, clarity: bestCorr };
     }
 
-    // Parabolic interpolation around peak lag
     let lag = bestLag;
     if (bestLag > minLag && bestLag < maxLag) {
       let c0 = 0, c1 = 0, c2 = 0;
@@ -96,17 +95,11 @@
     _chipEl: null,
 
     preferEnabled() {
-      try {
-        return localStorage.getItem(MIC_STORE) === "1";
-      } catch {
-        return false;
-      }
+      try { return localStorage.getItem(MIC_STORE) === "1"; } catch { return false; }
     },
 
     persist(on) {
-      try {
-        localStorage.setItem(MIC_STORE, on ? "1" : "0");
-      } catch {}
+      try { localStorage.setItem(MIC_STORE, on ? "1" : "0"); } catch {}
     },
 
     setStatus(status, label) {
@@ -115,9 +108,7 @@
       const chip = this._chipEl || document.getElementById("micChip");
       if (el) {
         const on = status === "listening";
-        el.innerHTML =
-          `<span class="midi-dot ${on ? "on" : ""}" id="micDot"></span>` +
-          (label || this.defaultLabel(status));
+        el.innerHTML = `<span class="midi-dot ${on ? "on" : ""}" id="micDot"></span>` + (label || this.defaultLabel(status));
       }
       if (chip) {
         chip.classList.toggle("on", status === "listening");
@@ -127,16 +118,11 @@
 
     defaultLabel(status) {
       switch (status) {
-        case "listening":
-          return "Mic listening — play one note in a quiet room";
-        case "denied":
-          return "Mic permission denied";
-        case "unsupported":
-          return "Mic not supported in this browser";
-        case "error":
-          return "Mic error — tap Mic to retry";
-        default:
-          return "Mic off";
+        case "listening": return "Mic listening — play one note in a quiet room";
+        case "denied": return "Mic permission denied";
+        case "unsupported": return "Mic not supported in this browser";
+        case "error": return "Mic error — tap Mic to retry";
+        default: return "Mic off";
       }
     },
 
@@ -154,14 +140,12 @@
     },
 
     emit(midi, on, velocity) {
-      const sink = (typeof InputProvider !== "undefined" && InputProvider)
-        || global.InputProvider;
+      const sink = (typeof InputProvider !== "undefined" && InputProvider) || global.InputProvider;
       if (sink && typeof sink.note === "function") sink.note(midi, on, velocity);
     },
 
     feedbackBlocked(midi) {
-      const eng = (typeof PianoEngine !== "undefined" && PianoEngine)
-        || global.PianoEngine;
+      const eng = (typeof PianoEngine !== "undefined" && PianoEngine) || global.PianoEngine;
       if (!eng || !eng.held) return false;
       if (!eng.held.has(midi)) return false;
       return !this.micHeld.has(midi);
@@ -189,8 +173,7 @@
     },
 
     releaseAll() {
-      const held = [...this.micHeld];
-      held.forEach(m => this.noteOff(m));
+      [...this.micHeld].forEach(m => this.noteOff(m));
       this.micHeld.clear();
       this.activeMidi = null;
       this.candidate = null;
@@ -207,11 +190,7 @@
       this.starting = true;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
         const Ctx = global.AudioContext || global.webkitAudioContext;
         const ctx = new Ctx();
@@ -233,8 +212,7 @@
         this.loop();
       } catch (err) {
         this.starting = false;
-        const denied =
-          err && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError");
+        const denied = err && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError");
         this.setStatus(denied ? "denied" : "error");
         this.persist(false);
       }
@@ -243,24 +221,12 @@
     stop() {
       this.enabled = false;
       this.starting = false;
-      if (this.raf) {
-        cancelAnimationFrame(this.raf);
-        this.raf = 0;
-      }
+      if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; }
       this.releaseAll();
-      if (this.source) {
-        try { this.source.disconnect(); } catch {}
-        this.source = null;
-      }
+      if (this.source) { try { this.source.disconnect(); } catch {} this.source = null; }
       this.analyser = null;
-      if (this.stream) {
-        this.stream.getTracks().forEach(t => t.stop());
-        this.stream = null;
-      }
-      if (this.ctx) {
-        try { this.ctx.close(); } catch {}
-        this.ctx = null;
-      }
+      if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+      if (this.ctx) { try { this.ctx.close(); } catch {} this.ctx = null; }
       this.persist(false);
       this.setStatus("off");
     },
@@ -274,9 +240,7 @@
         this.silentCount += 1;
         this.stableCount = 0;
         this.candidate = null;
-        if (this.activeMidi != null && this.silentCount >= SILENT_FRAMES) {
-          this.noteOff(this.activeMidi);
-        }
+        if (this.activeMidi != null && this.silentCount >= SILENT_FRAMES) this.noteOff(this.activeMidi);
       } else {
         this.silentCount = 0;
         let midi = freqToMidi(freq);
@@ -284,10 +248,7 @@
           this.stableCount = 0;
           this.candidate = null;
         } else {
-          if (
-            this.activeMidi != null &&
-            Math.abs(centsOff(freq, this.activeMidi)) < HYSTERESIS_CENTS
-          ) {
+          if (this.activeMidi != null && Math.abs(centsOff(freq, this.activeMidi)) < HYSTERESIS_CENTS) {
             midi = this.activeMidi;
             this.stableCount = STABLE_FRAMES;
           } else if (this.candidate === midi) {
@@ -296,16 +257,30 @@
             this.candidate = midi;
             this.stableCount = 1;
           }
-
-          if (this.stableCount >= STABLE_FRAMES) {
-            if (this.activeMidi !== midi) this.noteOn(midi, rms);
-          }
+          if (this.stableCount >= STABLE_FRAMES && this.activeMidi !== midi) this.noteOn(midi, rms);
         }
       }
-
       this.raf = requestAnimationFrame(() => this.loop());
     }
   };
 
   global.MicPitch = MicPitch;
+
+  function autoBindMicUi() {
+    const chip = document.getElementById("micChip");
+    const status = document.getElementById("micStatus");
+    if (!chip && !status) return;
+    MicPitch.bindUi(chip, status);
+    if (MicPitch.preferEnabled() && chip) {
+      chip.title = "Mic preferred on — tap to allow microphone";
+    }
+  }
+
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", autoBindMicUi);
+    } else {
+      setTimeout(autoBindMicUi, 0);
+    }
+  }
 })(typeof window !== "undefined" ? window : globalThis);
