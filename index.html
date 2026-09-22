@@ -3,15 +3,215 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="screen-orientation" content="any" />
+  <meta name="theme-color" content="#000000" />
   <title>SparkKeys — Piano from Zero</title>
-  <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/app.css" />
+
 </head>
 <body>
-  <p style="font-family:sans-serif;padding:24px;background:#08101c;color:#eef4ff;min-height:100vh">
-    SparkKeys files are in this repository.
-    The playable piano needs <code>css/app.css</code>, <code>js/grand-engine.js</code> and <code>js/app.js</code> next to this page.
-    Open the chat preview in Grok for the working single-file app while those files finish landing.
-  </p>
+  <div id="app">
+    <header class="appbar">
+      <div class="brand">
+        <div class="logo">♪</div>
+        <div>
+          <h1>SparkKeys</h1>
+          <p>From zero to your first songs</p>
+        </div>
+      </div>
+      <div class="chiprow">
+        <span class="chip" id="waitChip">Wait for you</span>
+        <span class="chip" id="nameChip">Note names</span>
+      </div>
+    </header>
+
+    <div class="screens">
+      <section class="screen active" id="home">
+        <div class="continue-card">
+          <p class="kicker" id="dashKicker">GET STARTED</p>
+          <h2 id="dashPiece">Ode to Joy</h2>
+          <p class="obj" id="dashObj">Play the first four notes of a real tune.</p>
+          <div class="dash-row"><span id="dashLesson">Lesson 1 of 25</span><span id="dashPct">0%</span></div>
+          <div class="bar"><span id="dashBar"></span></div>
+          <div class="badge-row" id="dashBadges"></div>
+          <button class="big" id="continueBtn">Get Started</button>
+        </div>
+        <div class="nav-grid">
+          <button class="card" data-go="course"><div><h3>Course</h3><p>25 song-first lessons</p></div></button>
+          <button class="card" data-go="mymusic"><div><h3>My Music</h3><p>Your growing pieces</p></div></button>
+          <button class="card" data-go="songs"><div><h3>Free Play</h3><p>Any song, any view</p></div></button>
+          <button class="card" data-go="theory"><div><h3>Theory</h3><p>Pictures for what you play</p></div></button>
+          <button class="card" data-go="progress"><div><h3>Progress</h3><p>Accuracy and time</p></div></button>
+          <button class="card" data-go="keys"><div><h3>Keys lab</h3><p>Tap and hear</p></div></button>
+          <button class="card" data-go="profile"><div><h3>Profile</h3><p id="profileNavHint">Email, Google, Facebook</p></div></button>
+        </div>
+        <p style="margin:12px 2px 0;font-size:12px;color:var(--muted)" id="midiStatus"><span class="midi-dot" id="midiDot"></span>Concert grand · first tap loads samples · hold to sustain · MIDI optional</p>
+      </section>
+
+      <section class="screen" id="course">
+        <div class="studio-top">
+          <button class="back" id="courseBack">‹</button>
+          <div class="lesson-meta"><h2>Course</h2><p>25 lessons · tap any row to play</p></div>
+        </div>
+        <div class="assist" id="courseTools">
+          <button id="unlockAllBtn" class="on">Unlock all (test)</button>
+          <button id="resetProgBtn">Reset progress</button>
+        </div>
+        <div id="courseList"></div>
+      </section>
+
+      <section class="screen" id="mymusic">
+        <div class="studio-top">
+          <button class="back" id="musicBack">‹</button>
+          <div class="lesson-meta"><h2>My Music</h2><p>Pieces getting fuller</p></div>
+        </div>
+        <div id="musicList"></div>
+      </section>
+
+      <section class="screen" id="progressScreen">
+        <div class="studio-top">
+          <button class="back" id="progBack">‹</button>
+          <div class="lesson-meta"><h2>Progress</h2><p>What your practice is building</p></div>
+        </div>
+        <div class="theory-card" id="progCard"></div>
+      </section>
+
+      <section class="screen" id="profile">
+        <div class="studio-top">
+          <button class="back" id="profileBack">‹</button>
+          <div class="lesson-meta"><h2>Profile</h2><p>Your practice identity on this device</p></div>
+        </div>
+        <div class="theory-card">
+          <h3 id="profileTitle">Sign in to keep your place</h3>
+          <p id="profileBody">Lessons already save on this phone. A profile lets SparkKeys attach that memory to your name and email.</p>
+          <p class="profile-who" id="profileWho">Not signed in</p>
+          <input class="profile-field" id="profileName" placeholder="Your name" autocomplete="name" />
+          <input class="profile-field" id="profileEmail" type="email" placeholder="Email address" autocomplete="email" />
+          <button class="auth-btn email" id="emailLogin">Continue with email</button>
+          <button class="auth-btn google" id="googleLogin">Continue with Google</button>
+          <button class="auth-btn facebook" id="facebookLogin">Continue with Facebook</button>
+          <button class="auth-btn out" id="profileSignOut" style="display:none">Sign out</button>
+          <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">Google and Facebook here store a local profile tag. Real OAuth belongs in the native app. No passwords are kept.</p>
+        </div>
+      </section>
+
+      <section class="screen" id="theory">
+        <div class="studio-top">
+          <button class="back" id="theoryBack">‹</button>
+          <div class="lesson-meta">
+            <h2>Music theory, gently</h2>
+            <p>Pictures first. Fancy words can wait.</p>
+          </div>
+        </div>
+        <div class="theory-tabs" id="theoryTabs"></div>
+        <article class="theory-card" id="theoryCard"></article>
+        <div class="theory-nav">
+          <button id="theoryPrev">Back</button>
+          <button id="theoryNext" class="primary">Next idea ›</button>
+        </div>
+      </section>
+
+      <section class="screen" id="studio">
+        <div class="studio-lights" aria-hidden="true">
+          <span class="glow glow-teal"></span>
+          <span class="glow glow-gold"></span>
+          <span class="glow glow-rim"></span>
+        </div>
+        <button type="button" id="rotateHint">↻ Turn piano wide</button>
+        <div class="studio-top">
+          <button class="back" id="backBtn">‹</button>
+          <div class="lesson-meta">
+            <h2 id="lessonTitle">Ode to Joy</h2>
+            <p id="lessonSub">Right hand · C position · 4/4</p>
+          </div>
+          <div class="modes">
+            <button id="modeSheet">Sheet</button>
+            <button id="modeFall" class="on">Fall</button>
+            <button id="wideKeysBtn">Wide</button>
+          </div>
+        </div>
+        <div class="songs" id="songRow"></div>
+        <div class="hands">
+          <button id="handR" class="on">Right</button>
+          <button id="handL">Left</button>
+          <button id="handB">Both</button>
+        </div>
+        <div class="assist">
+          <button id="assistLearn" class="on">Learn</button>
+          <button id="assistPractice">Practice</button>
+          <button id="assistChallenge">Challenge</button>
+        </div>
+        <div class="viz">
+          <canvas id="fall"></canvas>
+          <div id="fallTitle">
+            <span class="brandMark">SPARK<span>KEYS</span></span>
+            <div class="fallMeta">
+              <strong id="fallSong">Ode to Joy</strong>
+              <em id="fallLesson">Lesson</em>
+            </div>
+          </div>
+          <div id="staffWrap">
+            <div class="staff-tools">
+              <span>Treble clef · tap Play and follow the gold note</span>
+              <span id="countIn"></span>
+            </div>
+            <svg id="staff" viewBox="0 0 1000 240" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+          <div id="coach">Place your right thumb on <b>Middle C</b>. Fingers rest on C D E F G.</div>
+          <div class="toast" id="toast">Nice!</div>
+        </div>
+        <div class="progress"><span id="pbar"></span></div>
+        <div class="controls">
+          <button class="playbtn" id="playBtn">▶</button>
+          <div class="ctrl">
+            <label>Tempo <span id="bpmLabel">80 BPM</span></label>
+            <input id="bpm" type="range" min="50" max="140" value="80" />
+          </div>
+          <div class="ctrl" style="max-width:90px">
+            <label>Volume <span id="volLabel">70%</span></label>
+            <input id="vol" type="range" min="0" max="100" value="70" />
+          </div>
+        </div>
+        <div id="board">
+          <div class="whites" id="whites"></div>
+          <div class="blacks" id="blacks"></div>
+          <div class="hintbar" id="hintbar">Tap a glowing key</div>
+        </div>
+        <div class="overlay" id="introOverlay">
+          <div class="sheet">
+            <p class="kicker" id="introKicker">Lesson 1</p>
+            <h3 id="introTitle">Play something real</h3>
+            <p id="introBody"></p>
+            <button class="big" id="introPreview">Hear the goal</button>
+            <button class="big" id="introStart" style="background:rgba(255,255,255,.08);color:var(--ink);margin-top:8px">Start playing</button>
+            <button class="big" id="introSkip" style="background:rgba(255,255,255,.08);color:var(--ink);margin-top:8px">Skip lesson (test)</button>
+          </div>
+        </div>
+        <div class="overlay" id="sumOverlay">
+          <div class="sheet">
+            <p class="kicker">Performance</p>
+            <div class="earned-badge" id="sumBadge">♪</div>
+            <h3 id="sumTitle">Section complete</h3>
+            <div class="stats">
+              <div class="stat"><b id="sumAcc">—</b><span>accuracy</span></div>
+              <div class="stat"><b id="sumOk">—</b><span>correct</span></div>
+              <div class="stat"><b id="sumBad">—</b><span>misses</span></div>
+              <div class="stat"><b id="sumStreak">—</b><span>best streak</span></div>
+              <div class="stat"><b id="sumTime">—</b><span>avg response</span></div>
+              <div class="stat"><b id="sumMaster">—</b><span>mastery</span></div>
+            </div>
+            <p id="sumRec"></p>
+            <button class="big" id="sumNext">Continue course</button>
+            <button class="big" id="sumRetry" style="background:rgba(255,255,255,.08);color:var(--ink);margin-top:8px">Try again</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+
   <script src="js/grand-engine.js"></script>
   <script src="js/app.js"></script>
 </body>
