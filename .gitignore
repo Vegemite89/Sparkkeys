@@ -1,0 +1,14 @@
+# Local deploy cache and tooling (never commit)
+.firebase/
+node_modules/
+package-lock.json
+*.bak
+update_args.json
+
+# Secrets (never commit)
+.env
+.env.*
+*service-account*.json
+*-sa.json
+*.pem
+*.key
