@@ -22,6 +22,7 @@
         </div>
       </div>
       <div class="chiprow">
+        <button type="button" class="chip auth-chip" id="authHeaderBtn" title="Sign in">Sign in</button>
         <span class="chip" id="waitChip">Wait for you</span>
         <span class="chip" id="nameChip">Note names</span>
       </div>
@@ -85,19 +86,27 @@
       <section class="screen" id="profile">
         <div class="studio-top">
           <button class="back" id="profileBack">‹</button>
-          <div class="lesson-meta"><h2>Profile</h2><p>Your practice identity on this device</p></div>
+          <div class="lesson-meta"><h2>Profile</h2><p>Sign in to attach practice to your account</p></div>
         </div>
-        <div class="theory-card">
+        <div class="theory-card auth-panel">
           <h3 id="profileTitle">Sign in to keep your place</h3>
-          <p id="profileBody">Lessons already save on this phone. A profile lets SparkKeys attach that memory to your name and email.</p>
+          <p id="profileBody">Lessons already save on this device (localStorage). Sign in when Firebase is configured so SparkKeys can recognize you across sessions.</p>
           <p class="profile-who" id="profileWho">Not signed in</p>
-          <input class="profile-field" id="profileName" placeholder="Your name" autocomplete="name" />
-          <input class="profile-field" id="profileEmail" type="email" placeholder="Email address" autocomplete="email" />
-          <button class="auth-btn email" id="emailLogin">Continue with email</button>
-          <button class="auth-btn google" id="googleLogin">Continue with Google</button>
-          <button class="auth-btn facebook" id="facebookLogin">Continue with Facebook</button>
-          <button class="auth-btn out" id="profileSignOut" style="display:none">Sign out</button>
-          <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">Google and Facebook here store a local profile tag. Real OAuth belongs in the native app. No passwords are kept.</p>
+          <p class="auth-status" id="authStatus" hidden></p>
+          <div id="authSignedOutBlock">
+            <input class="profile-field" id="profileName" placeholder="Display name (optional)" autocomplete="name" />
+            <input class="profile-field" id="profileEmail" type="email" placeholder="Email address" autocomplete="email" />
+            <input class="profile-field" id="profilePassword" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" />
+            <div class="auth-row">
+              <button type="button" class="auth-btn email" id="emailSignIn">Sign in</button>
+              <button type="button" class="auth-btn email-alt" id="emailSignUp">Sign up</button>
+            </div>
+            <div class="auth-divider"><span>or</span></div>
+            <button type="button" class="auth-btn google" id="googleLogin">Continue with Google</button>
+            <button type="button" class="auth-btn facebook" id="facebookLogin">Continue with Facebook</button>
+          </div>
+          <button type="button" class="auth-btn out" id="profileSignOut" style="display:none">Sign out</button>
+          <p class="auth-footnote" id="authFootnote">Progress stays on this device until cloud sync is added. Delete-account is still TODO.</p>
         </div>
       </section>
 
@@ -215,8 +224,36 @@
     </div>
   </div>
 
-  <script src="grand-engine.js"></script>
+  <div id="authModal" class="auth-modal" hidden aria-hidden="true">
+    <div class="auth-modal-backdrop" id="authModalBackdrop"></div>
+    <div class="auth-modal-card" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <button type="button" class="auth-modal-close" id="authModalClose" aria-label="Close">×</button>
+      <p class="kicker">Account</p>
+      <h3 id="authModalTitle">Sign in to SparkKeys</h3>
+      <p class="profile-who" id="authModalWho">Not signed in</p>
+      <p class="auth-status" id="authModalStatus" hidden></p>
+      <div id="authModalForm">
+        <input class="profile-field" id="authModalEmail" type="email" placeholder="Email address" autocomplete="email" />
+        <input class="profile-field" id="authModalPassword" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" />
+        <div class="auth-row">
+          <button type="button" class="auth-btn email" id="authModalSignIn">Sign in</button>
+          <button type="button" class="auth-btn email-alt" id="authModalSignUp">Sign up</button>
+        </div>
+        <div class="auth-divider"><span>or</span></div>
+        <button type="button" class="auth-btn google" id="authModalGoogle">Continue with Google</button>
+        <button type="button" class="auth-btn facebook" id="authModalFacebook">Continue with Facebook</button>
+      </div>
+      <button type="button" class="auth-btn out" id="authModalSignOut" style="display:none">Sign out</button>
+      <p class="auth-footnote">Open Profile for display name. Cloud sync is not enabled yet.</p>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="firebase-auth.js"></script>
+  <script src="grand-engine.js?v=20261004a"></script>
   <script src="mic-engine.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20261004a"></script>
 </body>
 </html>
