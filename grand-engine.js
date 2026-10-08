@@ -1,16 +1,14 @@
 /* SparkKeys concert-grand sampler — web prototype
    Single PianoEngine used by app.js.
 
-   Current web audio:
-   - Recorded acoustic-grand samples, one dynamic per pitch (C1–C8).
-   - Velocity is gain + low-pass shaping of that one recording.
-   - Not four different hammer recordings.
+   Audio path:
+   - Recorded acoustic-grand samples from CDN (tonejs-instruments@master).
+   - Velocity shapes gain + low-pass on the loaded buffer.
+   - No synth / practice-tone fallback — queue load, then start the buffer.
+   - Web Audio unlocks on first user gesture (browser autoplay policy).
 
-   Optional later (web): drop licensed files into
+   Optional local pack layout:
      samples/soft/C4.mp3  samples/medium/C4.mp3  samples/hard/C4.mp3
-   The loader will pick them up without rewriting SparkKeys.
-
-   Native Flutter target (deferred): bundled pp/mp/mf/ff, offline.
 */
 const GRAND_SPEC = {
   id: "sparkkeys-grand-v1",
@@ -24,7 +22,7 @@ const GRAND_SPEC = {
   plannedNativeVelocityLayers: 4,
   optionalWebLayers: ["soft", "medium", "hard"],
   velocityMap: { soft: [1, 54], medium: [55, 96], hard: [97, 127] },
-  maxConcurrentLoads: 3,
+  maxConcurrentLoads: 4,
   reverb: 0.14,
   resonance: 0.06
 };
@@ -38,9 +36,12 @@ const PianoEngine = {
   queue: [],
   activeLoads: 0,
   discoveredLayers: null,
+  localPackDetected: false,
   ready: false,
   nextId: 1,
   pressGen: new Map(),
+  unlockPromise: null,
+  sampleErrors: 0,
 
   sampleName(midi) {
     const n = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"][midi % 12];
@@ -62,22 +63,78 @@ const PianoEngine = {
   cacheKey(midi, layer) {
     return this.nearestSampleMidi(midi) + ":" + (layer || "medium");
   },
+
+  /** CDN master first; optional local pack when detected. No dead @1.0.0 alt. */
   urlsFor(midi, layer) {
     const name = this.sampleName(this.nearestSampleMidi(midi)) + "." + GRAND_SPEC.format;
-    const list = [];
-    if (layer && layer !== "medium") list.push(GRAND_SPEC.localRoot + layer + "/" + name);
-    list.push(GRAND_SPEC.localRoot + "medium/" + name);
-    list.push(GRAND_SPEC.sampleRoot + name);
-    return list;
+    const localLayer = (layer && layer !== "medium")
+      ? GRAND_SPEC.localRoot + layer + "/" + name
+      : null;
+    const localMed = GRAND_SPEC.localRoot + "medium/" + name;
+    const cdn = GRAND_SPEC.sampleRoot + name;
+    if (this.localPackDetected) {
+      return [localLayer, localMed, cdn].filter(Boolean);
+    }
+    return [cdn];
   },
 
-  ensure() {
+  unlock() {
+    const audio = this.ensure(false);
+    if (!audio || !audio.ctx) return Promise.resolve(null);
+    const kickSilent = () => {
+      if (this._iosKicked) return;
+      this._iosKicked = true;
+      try {
+        const buf = audio.ctx.createBuffer(1, 1, audio.ctx.sampleRate || 44100);
+        const src = audio.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audio.ctx.destination);
+        src.start(0);
+      } catch (_) {}
+    };
+    if (audio.ctx.state === "running") {
+      kickSilent();
+      this.refreshStatus && this.refreshStatus();
+      return Promise.resolve(audio);
+    }
+    if (!this.unlockPromise) {
+      this.unlockPromise = audio.ctx.resume()
+        .catch(() => null)
+        .then(() => {
+          this.unlockPromise = null;
+          if (audio.ctx.state === "running") kickSilent();
+          this.refreshStatus && this.refreshStatus();
+          return audio.ctx.state === "running" ? audio : null;
+        });
+    }
+    return this.unlockPromise;
+  },
+
+  setVolume(v) {
+    const vol = Math.max(0, Math.min(1, Number(v)));
+    if (typeof state !== "undefined") state.volume = vol;
+    const audio = (typeof state !== "undefined" && state.audio) || null;
+    if (audio && audio.master) audio.master.gain.value = vol;
+  },
+
+  ensure(doResume = true) {
     if (state.audio) {
-      if (state.audio.ctx.state === "suspended") state.audio.ctx.resume();
+      if (doResume && state.audio.ctx.state === "suspended") {
+        state.audio.ctx.resume().catch(() => {});
+      }
       return state.audio;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC({ latencyHint: "interactive" });
+    if (!AC) {
+      console.warn("Web Audio API unavailable");
+      return null;
+    }
+    let ctx;
+    try {
+      ctx = new AC({ latencyHint: "interactive" });
+    } catch (_) {
+      ctx = new AC();
+    }
     const master = ctx.createGain();
     master.gain.value = state.volume == null ? 0.7 : state.volume;
     const dry = ctx.createGain();
@@ -98,6 +155,9 @@ const PianoEngine = {
     comp.connect(master);
     master.connect(ctx.destination);
     state.audio = { ctx, master, dry, wet };
+    if (doResume && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     this._probeLayers();
     return state.audio;
   },
@@ -118,22 +178,34 @@ const PianoEngine = {
   _probeLayers() {
     if (this.discoveredLayers) return;
     this.discoveredLayers = ["medium"];
-    const tryLayer = name => fetch(GRAND_SPEC.localRoot + name + "/C4." + GRAND_SPEC.format, { method: "HEAD" })
-      .then(r => {
-        if (r.ok && !this.discoveredLayers.includes(name)) {
-          this.discoveredLayers.push(name);
-          this.discoveredLayers.sort((a, b) =>
-            GRAND_SPEC.optionalWebLayers.indexOf(a) - GRAND_SPEC.optionalWebLayers.indexOf(b));
-        }
-      })
-      .catch(() => {});
-    tryLayer("soft");
-    tryLayer("hard");
-    tryLayer("medium");
+    const isAudioResponse = (r) => {
+      if (!r.ok) return false;
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      return ct.startsWith("audio/");
+    };
+    const tryLayer = (name, markPack) =>
+      fetch(GRAND_SPEC.localRoot + name + "/C4." + GRAND_SPEC.format, { method: "HEAD" })
+        .then(r => {
+          // SPA hosts often 200 HTML for missing /samples/* — never treat that as a pack.
+          if (!isAudioResponse(r)) return;
+          if (markPack) this.localPackDetected = true;
+          if (!this.discoveredLayers.includes(name)) {
+            this.discoveredLayers.push(name);
+            this.discoveredLayers.sort((a, b) =>
+              GRAND_SPEC.optionalWebLayers.indexOf(a) - GRAND_SPEC.optionalWebLayers.indexOf(b));
+          }
+        })
+        .catch(() => {});
+    tryLayer("medium", true).then(() => {
+      if (this.localPackDetected) {
+        tryLayer("soft", false);
+        tryLayer("hard", false);
+      }
+    });
   },
 
   prioritize(midi) {
-    this.ensure();
+    this.ensure(false);
     this.load(midi, this.layerForVelocity(82), true);
     [midi - 2, midi - 1, midi + 1, midi + 2].forEach(m => {
       if (m >= GRAND_SPEC.compass[0] && m <= GRAND_SPEC.compass[1]) this.load(m, "medium", false);
@@ -141,7 +213,7 @@ const PianoEngine = {
   },
 
   warmVisible(from, to) {
-    this.ensure();
+    this.ensure(false);
     const a = from == null ? 36 : from;
     const b = to == null ? 76 : to;
     const midis = [];
@@ -179,18 +251,30 @@ const PianoEngine = {
   },
 
   _fetch(midi, layer, key) {
-    const { ctx } = this.ensure();
+    const audio = this.ensure(false);
+    if (!audio) return Promise.resolve(null);
+    const { ctx } = audio;
     const tryUrl = urls => {
       if (!urls.length) return Promise.resolve(null);
-      return fetch(urls[0]).then(r => {
+      const url = urls[0];
+      return fetch(url).then(r => {
         if (!r.ok) return tryUrl(urls.slice(1));
-        return r.arrayBuffer();
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        // Wrong type (e.g. SPA HTML) or empty → miss; fall through to CDN.
+        if (!ct.startsWith("audio/")) return tryUrl(urls.slice(1));
+        return r.arrayBuffer().then(raw =>
+          ctx.decodeAudioData(raw.slice(0)).catch(() => tryUrl(urls.slice(1)))
+        );
       }).catch(() => tryUrl(urls.slice(1)));
     };
     return tryUrl(this.urlsFor(midi, layer))
-      .then(raw => raw ? ctx.decodeAudioData(raw.slice(0)) : null)
       .then(buf => {
-        if (buf) this.buffers.set(key, buf);
+        if (buf) {
+          this.buffers.set(key, buf);
+          this.sampleErrors = Math.max(0, this.sampleErrors - 1);
+        } else {
+          this.sampleErrors += 1;
+        }
         this.loading.delete(key);
         this.ready = this.buffers.size > 0;
         this._paintLoad();
@@ -198,10 +282,14 @@ const PianoEngine = {
       })
       .catch(err => {
         this.loading.delete(key);
+        this.sampleErrors += 1;
         console.warn("Grand sample failed", key, err);
+        this._paintLoad();
         return null;
       });
   },
+
+  refreshStatus() { this._paintLoad(); },
 
   _paintLoad() {
     const el = document.getElementById("midiStatus");
@@ -213,9 +301,18 @@ const PianoEngine = {
       ? this.discoveredLayers.length + " recorded layers"
       : "1 recorded dynamic";
     const dot = `<span class="midi-dot ${n ? "on" : ""}" id="midiDot"></span>`;
-    el.innerHTML = n
-      ? dot + "Concert grand · " + layers + " · hold to sustain · MIDI optional"
-      : dot + "Loading grand samples…";
+    const ctx = (typeof state !== "undefined" && state.audio && state.audio.ctx) ? state.audio.ctx : null;
+    if (ctx && ctx.state !== "running") {
+      el.innerHTML = dot + "Tap a key to unlock sound";
+      return;
+    }
+    if (n) {
+      el.innerHTML = dot + "Concert grand · Ready · hold to sustain";
+    } else if (this.sampleErrors > 2) {
+      el.innerHTML = dot + "Grand samples unavailable · check network · MIDI optional";
+    } else {
+      el.innerHTML = dot + "Loading grand samples…";
+    }
   },
 
   layerGain(vel) {
@@ -228,7 +325,10 @@ const PianoEngine = {
   },
 
   noteOn(midi, velocity = 82) {
-    const { ctx, dry, wet } = this.ensure();
+    const unlockP = this.unlock();
+    const audio = this.ensure(false);
+    if (!audio) return -1;
+    const { ctx, dry, wet } = audio;
     const vel = Math.max(1, Math.min(127, velocity | 0));
     const layer = this.layerForVelocity(vel);
     const t = ctx.currentTime;
@@ -261,6 +361,7 @@ const PianoEngine = {
       pedal: false,
       preview: false,
       born: t,
+      pressedAt: performance.now(),
       dead: false,
       layer,
       vel
@@ -269,14 +370,38 @@ const PianoEngine = {
     this.held.set(midi, voice.id);
     const gen = (this.pressGen.get(midi) || 0) + 1;
     this.pressGen.set(midi, gen);
+    const startWhenReady = (buf) => {
+      const go = () => {
+        if (this.pressGen.get(midi) !== gen) return;
+        if (voice.dead) return;
+        if (!buf) return;
+        if (ctx.state !== "running") {
+          this.unlock().then(() => {
+            if (ctx.state === "running") this._startBuf(voice, buf, midi);
+          });
+          return;
+        }
+        this._startBuf(voice, buf, midi);
+      };
+      if (unlockP && typeof unlockP.then === "function") unlockP.then(go); else go();
+    };
     const buf = this.buffers.get(this.cacheKey(midi, layer)) || this.buffers.get(this.cacheKey(midi, "medium"));
-    if (buf) this._startBuf(voice, buf, midi);
-    else {
+    if (buf) {
+      startWhenReady(buf);
+    } else {
       this.load(midi, layer, true).then(loaded => {
         if (this.pressGen.get(midi) !== gen) return;
-        if (voice.dead || !voice.keyDown && !voice.pedal && !voice.preview) return;
+        if (voice.dead) return;
         const use = loaded || this.buffers.get(this.cacheKey(midi, "medium"));
-        if (use) this._startBuf(voice, use, midi);
+        if (!use) return;
+        const stillHeld = voice.keyDown || voice.pedal || voice.preview;
+        const recentTap = (performance.now() - voice.pressedAt) < 900;
+        if (!stillHeld && !recentTap) return;
+        startWhenReady(use);
+        if (!stillHeld && recentTap) {
+          const rel = midi < 50 ? 0.55 : midi < 72 ? 0.38 : 0.26;
+          setTimeout(() => { if (!voice.dead) this._kill(voice, rel); }, 40);
+        }
       });
     }
     this.prioritize(midi);
@@ -287,28 +412,32 @@ const PianoEngine = {
 
   _startBuf(voice, buf, midi) {
     if (!voice || voice.dead || voice.nodes.length) return;
-    const { ctx } = this.ensure();
+    const audio = this.ensure(false);
+    if (!audio) return;
+    const { ctx } = audio;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const srcMidi = this.nearestSampleMidi(midi);
     src.playbackRate.value = Math.pow(2, (midi - srcMidi) / 12);
     src.connect(voice.filter);
-    try { src.start(ctx.currentTime); } catch {}
+    try { src.start(ctx.currentTime); } catch (_) {}
     voice.nodes.push(src);
   },
 
   _resonate(midi, vel, t) {
-    const { wet } = this.ensure();
+    const audio = this.ensure(false);
+    if (!audio) return;
+    const { wet, ctx } = audio;
     [midi + 12, midi + 19].forEach(m => {
       const buf = this.buffers.get(this.cacheKey(m, "medium"));
       if (!buf) return;
-      const g = this.ensure().ctx.createGain();
+      const g = ctx.createGain();
       g.gain.value = GRAND_SPEC.resonance * (vel / 127);
-      const src = this.ensure().ctx.createBufferSource();
+      const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(g);
       g.connect(wet);
-      try { src.start(t); } catch {}
+      try { src.start(t); } catch (_) {}
       this.voices.push({
         id: this.nextId++, midi: m, amp: g, nodes: [src],
         keyDown: false, pedal: true, preview: true, born: t, dead: false, resonance: true
@@ -328,6 +457,8 @@ const PianoEngine = {
       voice.pedal = true;
       return;
     }
+    // Quick tap before CDN buffer arrived: don't kill yet — let load→recentTap start the chime.
+    if (!voice.nodes.length) return;
     this._release(voice);
   },
 
@@ -339,15 +470,17 @@ const PianoEngine = {
 
   _kill(voice, rel) {
     if (!voice || voice.dead) return;
-    const { ctx } = this.ensure();
+    const audio = this.ensure(false);
+    if (!audio) return;
+    const { ctx } = audio;
     const t = ctx.currentTime;
     try {
       const cur = Math.max(0.0001, voice.amp.gain.value || 0.0001);
       voice.amp.gain.cancelScheduledValues(t);
       voice.amp.gain.setValueAtTime(cur, t);
       voice.amp.gain.exponentialRampToValueAtTime(0.0001, t + rel);
-    } catch {}
-    voice.nodes.forEach(n => { try { n.stop(t + rel + 0.06); } catch {} });
+    } catch (_) {}
+    voice.nodes.forEach(n => { try { n.stop(t + rel + 0.06); } catch (_) {} });
     voice.dead = true;
     if (this.held.get(voice.midi) === voice.id) this.held.delete(voice.midi);
   },
@@ -385,3 +518,14 @@ const PianoEngine = {
     state.sustainPedal = false;
   }
 };
+
+(function bindAudioUnlock() {
+  if (typeof window === "undefined" || window.__sparkkeysAudioUnlockBound) return;
+  window.__sparkkeysAudioUnlockBound = true;
+  const kick = () => {
+    if (typeof PianoEngine !== "undefined" && PianoEngine.unlock) PianoEngine.unlock();
+  };
+  ["pointerdown", "touchstart", "mousedown", "keydown"].forEach(type => {
+    window.addEventListener(type, kick, { capture: true, passive: true });
+  });
+})();
